@@ -1,0 +1,142 @@
+---
+title: "Statistical inference with the GSS data"
+output: 
+  html_document: 
+    fig_height: 4
+    highlight: pygments
+    theme: spacelab
+---
+
+## Setup
+
+### Load packages
+
+```{r load-packages, message = FALSE}
+library(ggplot2)
+library(dplyr)
+library(statsr)
+```
+
+### Load data
+
+Make sure your data and R Markdown files are in the same directory. When loaded
+your data file will be called `gss`. Delete this note when before you submit 
+your work. 
+
+```{r load-data}
+load("gss.Rdata")
+```
+
+
+
+* * *
+
+## Part 1: Data
+
+Sample: Data for this sample is gathered through personal interviews conducted on random members of the population. The data samples is from 1972 to 2012. 
+
+This data set can be used for inference, but cannot be used to make causal conclusions or for causality studies.
+
+The target population of the GSS is people that live in households in the U.S. over the age of 18. The survey is conducted in English and started being conducted in Spanish in 2006. This survey only targets those that live households.
+
+Conclusions can only be made for the target population. 
+
+* * *
+
+## Part 2: Research question
+
+<strong>Research Quesiton: </strong>
+
+Is a connection between a person's race and chances of living in poverty at the age of 16? 
+
+As this survey covers 40 years of data and there have been many changes in that time, a subset of time will need to be chosen to analyze. I decided to choose years greater than or equal to 2000, as this was a time relative economic prosperity for the U.S. and is more likely to point out racial inequality. 
+
+This question is of importance as it shows whether the U.S. has truly integrated all races fully into society. 
+
+Important variables to consider in answering this question are: 
+race — Race of respondent.
+year — GSS year for this respondent
+incom16 — Rs family income when 16 years old
+
+```{r}
+#set for consideration
+
+r_i_study <- select(gss,year,race,incom16) %>% na.omit() %>%
+  mutate(poverty=grepl("Far Below Average",incom16)) %>%
+  mutate(y2000=as.factor(ifelse(year>=2000,"Y","N")))
+```
+
+* * *
+
+## Part 3: Exploratory data analysis
+
+To start with I will output a table of all the data which fits within the parameters specified, since the start of the survey. 
+
+```{r}
+poverty_by_region_table <- table(r_i_study$race,r_i_study$poverty)
+addmargins(poverty_by_region_table)
+```
+
+```{r}
+prob_tab <- prop.table(poverty_by_region_table)
+addmargins(prob_tab)
+```
+
+It can be seen in this table that the racial group with the highest poverty rate per capita is black. The overall poverty rate of the sampled population is 8.5%, for the time period specified. 
+
+It's easier to see visually in this bar graph.
+
+```{r}
+ggplot(r_i_study) + aes(x=race,fill=poverty) + geom_bar(position = "fill") +
+  labs(x="Respondent's Race",y="Proportion",title="Povertly Level by Race") 
+```
+
+Next, I will look at the data for the time period from 2000 to 2012. Which shows more modern data and distribution of poverty.  
+
+```{r}
+recent_povert <- filter(r_i_study,y2000=="Y")
+poverty_by_region_table <- table(recent_povert$race,recent_povert$poverty)
+addmargins(poverty_by_region_table)
+addmargins(prop.table(poverty_by_region_table))
+```
+
+The poverty level at the age 16 of the sample population, increases from 2000-2016, it goes up to 9.9%. It would be worth investigating why the poverty level appears to be increasing. There is a slight degrees for black and an increase for white. 
+
+
+```{r}
+ggplot(recent_povert) + aes(x=race,fill=poverty) + geom_bar(position = "fill") +
+  labs(x="Respondent's Race",y="Proportion",title="Povertly Level by Race") 
+```
+
+
+* * *
+
+## Part 4: Inference
+
+<strong>Hypothesis</strong>
+
+Null hypothesis: a respondents poverty level at 16 and race are independent variables. 
+Alternative hypothesis: poverty level at 16 does indeed vary by race. 
+
+The variables being used for this questions are categorical. The method for testing that my hypothesis given that categorical variable is being used is the chi-squared test of independence. 
+
+In order to conduct a chi-squared test certain conditions must be met: 
+
+Sampled data must be independent. This is true based on the sampling methods. 
+There needs to be a large enough sample size, which is true, as the sample size is in the thousands. 
+
+
+```{r}
+chisq.test(r_i_study$race,r_i_study$poverty)
+```
+
+
+```{r}
+chisq.test(recent_povert$race,recent_povert$poverty)
+```
+
+The test on the stat from 1972-2012 and the recent stat from 2000-2012 both produce p-values below alpha .05. This is a reason to reject the null hypothesis. 
+
+This means that poverty levels do indeed correlate with race, in the U.S. 
+
+Based on the results of this test further data could be gathered to determine why certain races have greater poverty levels than others. 
