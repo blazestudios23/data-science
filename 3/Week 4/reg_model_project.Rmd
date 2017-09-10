@@ -1,0 +1,282 @@
+---
+title: "Modeling and prediction for movies"
+output: 
+  html_document: 
+    fig_height: 4
+    highlight: pygments
+    theme: spacelab
+---
+
+## Setup
+
+### Load packages
+
+```{r load-packages, message = FALSE}
+library(ggplot2)
+library(dplyr)
+library(statsr)
+library(GGally)
+```
+
+### Load data
+
+Make sure your data and R Markdown files are in the same directory. When loaded
+your data file will be called `movies`. Delete this note when before you submit 
+your work. 
+
+```{r load-data}
+load("movies.Rdata")
+```
+
+
+
+* * *
+
+## Part 1: Data
+
+This dataset is comprised of data about 651 randomly sampled movies released before 2016. Part of the data is rating provided by <a href="https://www.rottentomatoes.com/">Rotten Tomatoes</a> and <a href="http://www.imdb.com/">IMDb</a>. 
+
+Rotten Tomatoes was launched in 1998. It focuses on film reviews and contains reviews from a variety of critics across the U.S. 
+
+The Internet Movie Database (IMDb) is an online database of information related to films, television programs, and video games, it includes such data as cast, production crew, fictional characters, biographies, plot summaries, trivia and reviews, operated by IMDb.com, Inc., a subsidiary of Amazon.
+
+<h3> Sampling </h3>
+The sampling is composed of randomly sampled U.S. movies theatrically released between 1970 and 2014. The data comes from Rotten Tomatoes and IMDb. 
+
+<h4> Scope of Inference </h4>
+
+This dataset can be considered to be the result of an observational retrospective study that uses random sampling. 
+
+Based on the sampling method we can assume that it is safe to generalize for all U.S. movies given in this data. 
+
+Observational studies show associations and not causality.
+
+* * *
+
+## Part 2: Research question
+
+<strong><em>What factor's make a movie popular? </em></strong>
+
+How one defines popularity is the first matter that must be taken up. Popularity will be defined as having a high audience score (audience_score) on Rotten Tomatoes or a high IMDb rating (imdb_rating) on IMDb. These two variables sound like they measure the same thing, which I will check for later. 
+
+So the question is, "What factor's make a movie have a high imdb_rating?"
+
+The factor's or other variables will be taken from the data set and their relevancy will be determined. 
+
+This question if of interest as it can help production studies and investors determine which movies will be liked by movie goers. 
+
+* * *
+
+## Part 3: Exploratory data analysis
+
+First, lest make sure that audience_score and imdb_rating are independent.
+
+```{r}
+plot(movies$audience_score ~ movies$imdb_rating)
+```
+
+
+```{r}
+cor(movies$audience_score, movies$imdb_rating)
+```
+
+As can be seen, there is a strong correlation between these two variables. This means that we don't need to use both of them. So we are going to use imdb_rating, as there are other imbd data that we are using such as imdb_num_votes, and it's best to use the one with the most other data connected to it. 
+
+Next, I will examine critics_score and critics_rating. critics_rating categorized interpretation of critics_score. So critics_rating will be removed from the model as well. 
+
+Next, let's look at a summary of the imdb_rating. 
+
+```{r}
+summary(movies$imdb_rating)
+```
+
+We can see that the mean is a rating of 6.493 and the top quarter of movies rate 7.300 or higher.
+
+Next let's look at a histogram of imdb_rating.
+
+```{r}
+ggplot(movies, aes(x = imdb_rating)) + geom_histogram() + xlab("Audience Score") + ylab("Count") + ggtitle("IMDB rating")
+
+```
+
+
+
+<h3>Examinations of Response and Categorical Variables</h3>
+
+We are first going to examine which genre's score the best. 
+
+
+```{r}
+ggplot(movies, aes(x=factor(genre), y=imdb_rating)) +
+  geom_boxplot() +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1))
+```
+
+We can see that some genres are rated much higher than other genres. Documentaries and Musical & Performing Arts generally rank very high with little variation. 
+
+Next, we will see if the year of release affects how well movies perform. 
+
+```{r}
+cor(movies$imdb_rating, movies$thtr_rel_year)
+```
+
+The relationship between these two variables is very low, thus there is no correlation. The same would apply to DVD release year. 
+
+Given that the data is collected over 30 years the same actors do not show up enough times to determine whether there is a correlation between names and popularity we will remove the actor name related variables.
+
+All movies have different titles, so there are is no way to count up which titles do better. The title column will be removed. 
+
+audience_rating is just a categorical rating of the audience score, so that will be excluded. 
+
+Most of the movies are directed by different directors, so the director columns will be removed.
+
+I am removing the movie studio as there are too many studios that only did one to two movies. These make it hard to determine if that was a factor or not in the popularity of a movie. 
+
+Lastly, I am removing the columns that contain the URLs of these movies as that bears no relationship to their popularity. 
+
+```{r}
+movies_aud_score <- movies[ -c(1, 6:7, 10, 15, 17:18, 25:32) ]
+movies_aud_score <- na.omit(movies_aud_score)
+```
+
+Listed below are all included variables. 
+
+```{r}
+names(movies_aud_score)
+```
+
+* * *
+
+## Part 4: Modeling
+
+We will first create the baseline model so as to be able to predict the response variables. We will include all variables to start with. 
+
+```{r}
+model <- lm(imdb_rating ~ title_type + genre + runtime + mpaa_rating + thtr_rel_month + thtr_rel_day + dvd_rel_month + dvd_rel_day + imdb_num_votes + critics_score + best_pic_nom + best_pic_win + best_actor_win + best_actress_win + best_dir_win + top200_box, data = movies_aud_score)
+summary(model)
+```
+
+We will now use backward p-value elimination to select the best model. Backward p-value selections are where we eliminate the variables with the highest p-value. I am using this method as it seems to be the simplest and most efficent way to come up with a model given the data set. 
+
+I will fist eliminate best_actress_win with a p-value of 0.93226, which is the highest p-value.  
+
+```{r}
+model2 <- lm(imdb_rating ~ title_type + genre + runtime + mpaa_rating + thtr_rel_month + thtr_rel_day + dvd_rel_month + dvd_rel_day + imdb_num_votes + critics_score + best_pic_nom + best_pic_win + best_actor_win + best_dir_win + top200_box, data = movies_aud_score)
+summary(model2)
+```
+
+Next I will eliminate best_actor_win with a p-value of 0.85722, the highest p-value.
+
+```{r}
+model3 <- lm(imdb_rating ~ title_type + genre + runtime + mpaa_rating + thtr_rel_month + thtr_rel_day + dvd_rel_month + dvd_rel_day + imdb_num_votes + critics_score + best_pic_nom + best_pic_win + best_dir_win + top200_box, data = movies_aud_score)
+summary(model3)
+```
+
+Next I will eliminate best_dir_win with a p-value of 0.74137, the highest p-value.
+
+```{r}
+model4 <- lm(imdb_rating ~ title_type + genre + runtime + mpaa_rating + thtr_rel_month + thtr_rel_day + dvd_rel_month + dvd_rel_day + imdb_num_votes + critics_score + best_pic_nom + best_pic_win + top200_box, data = movies_aud_score)
+summary(model4)
+```
+
+Next I will eliminate thtr_rel_day  with a p-value of 0.72146, the highest value.
+
+```{r}
+model5 <- lm(imdb_rating ~ title_type + genre + runtime + mpaa_rating + thtr_rel_month + dvd_rel_month + dvd_rel_day + imdb_num_votes + critics_score + best_pic_nom + best_pic_win + top200_box, data = movies_aud_score)
+summary(model5)
+```
+
+Next I will eliminate title_type has two high p-values, so I am removing this.
+
+```{r}
+model6 <- lm(imdb_rating ~ genre + runtime + mpaa_rating + thtr_rel_month + dvd_rel_month + dvd_rel_day + imdb_num_votes + critics_score + best_pic_nom + best_pic_win + top200_box, data = movies_aud_score)
+summary(model6)
+```
+
+Next I will eliminate best_pic_nom a p-value of 0.47121, the highest p-value.
+
+```{r}
+model7 <- lm(imdb_rating ~ genre + runtime + mpaa_rating + thtr_rel_month + dvd_rel_month + dvd_rel_day + imdb_num_votes + critics_score + best_pic_win + top200_box, data = movies_aud_score)
+summary(model7)
+```
+
+Next I will eliminate best_pic_win with a p-value of 0.348040.
+
+```{r}
+model8 <- lm(imdb_rating ~ genre + runtime + mpaa_rating + thtr_rel_month + dvd_rel_month + dvd_rel_day + imdb_num_votes + critics_score + top200_box, data = movies_aud_score)
+summary(model8)
+```
+
+Next I will eliminate  thtr_rel_month  with a p-value of 0.35322.
+
+```{r}
+model9 <- lm(imdb_rating ~ genre + runtime + mpaa_rating + top200_box + dvd_rel_month + dvd_rel_day + imdb_num_votes + critics_score, data = movies_aud_score)
+summary(model9)
+```
+
+Next I will eliminate top200_box with a p-value of 0.258624.
+
+```{r}
+model10 <- lm(imdb_rating ~ genre + runtime + mpaa_rating + dvd_rel_month + dvd_rel_day + imdb_num_votes + critics_score, data = movies_aud_score)
+summary(model10)
+```
+
+Next I will eliminate dvd_rel_month with a p-value of 0.104975.
+
+```{r}
+model11 <- lm(imdb_rating ~ genre + runtime + mpaa_rating + dvd_rel_day + imdb_num_votes + critics_score, data = movies_aud_score)
+summary(model11)
+```
+
+Next I will eliminate dvd_rel_day  with a p-value of  0.102400.
+
+```{r}
+model12 <- lm(imdb_rating ~ genre + runtime + mpaa_rating + imdb_num_votes + critics_score, data = movies_aud_score)
+summary(model12)
+```
+
+Next, we perform an ANOVA test which allows us to see possible associations between independent variables and the dependent variable. 
+
+
+```{r}
+anova(model12)
+```
+
+The anova test shows that all varables are significant predictors based on thier P-values. 
+
+* * *
+
+## Part 5: Prediction
+
+The next step is to test a movie with a prediction. We have selected Dr. Strange as the movie to run our prediction on. 
+
+```{r}
+dr_strange <- data.frame(title_type="Feature Film",
+                     genre="Action & Adventure",
+                     runtime=115,
+                     mpaa_rating="PG-13",
+                     imdb_rating=7.6,
+                     critics_rating="Certified Fresh",
+                     critics_score=90,
+                     audience_rating="Upright",
+                     audience_score=86,
+                     best_pic_nom="no",
+                     best_pic_win="no",
+                     best_actor_win="no",
+                     best_actress_win="no",
+                     best_dir_win="no",
+                     top200_box="yes",
+                     imdb_num_votes=312799)
+prediction_dr_strange <- predict(model12, newdata=dr_strange, interval="confidence")
+prediction_dr_strange 
+```
+
+The upper value of 7.75475 is greater than the actual score of 7.6, while the fit value was slightly lower than 7.6. 
+
+* * *
+
+## Part 6: Conclusion
+
+
+The model that was created here, based on this one test is fairly accurate. However, I'm not sure how useful this model is as it requires that a movie already has critical review before success is determined. A more useful model might predict critic reviews based on factors that exist during preproduction, which will help production companies to make more successful movies in general. 
+
